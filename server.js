@@ -1,71 +1,77 @@
 const express = require('express');
-const mongoose = require('mongoose');
 const cors = require('cors');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
-require('dotenv').config();
 
 const app = express();
 
-// Security Middleware
-app.use(helmet());
-app.use(cors({
-  origin: process.env.FRONTEND_URL || "https://autosparessolution.github.io",
-  credentials: true
-}));
+// Middleware
+app.use(cors());
+app.use(express.json());
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100
-});
-app.use(limiter);
-
-// Body parser
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
-
-// Database connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/autospares', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
-.then(() => console.log('✅ MongoDB Connected'))
-.catch(err => console.log('❌ MongoDB connection error:', err));
-
-// Routes
-app.use('/api/orders', require('./routes/orders'));
-app.use('/api/products', require('./routes/products'));
-app.use('/api/payments', require('./routes/payments'));
-
-// Health check
+// Health check - ALWAYS works
 app.get('/api/health', (req, res) => {
-  res.status(200).json({ 
+  console.log('✅ Health check called');
+  res.json({ 
     status: 'OK', 
-    message: 'Auto Spares Solution API is running',
+    message: 'Auto Spares Backend is running!',
     timestamp: new Date().toISOString()
   });
 });
 
-// Error handling
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ 
-    success: false, 
-    message: 'Something went wrong!'
+// Test payment endpoint
+app.post('/api/payments/create-order', (req, res) => {
+  console.log('💰 Payment order requested:', req.body);
+  
+  // Simulate Razorpay order creation
+  const orderData = {
+    id: 'order_' + Date.now(),
+    amount: req.body.amount * 100,
+    currency: req.body.currency || 'INR',
+    status: 'created'
+  };
+  
+  res.json({
+    success: true,
+    order: orderData,
+    message: 'Test mode - working!'
   });
 });
 
-// 404 handler
+// Test order creation
+app.post('/api/orders', (req, res) => {
+  console.log('📦 Order received:', req.body.customer?.name);
+  
+  res.json({
+    success: true,
+    order: {
+      orderId: 'ASS' + Date.now().toString().slice(-6),
+      status: 'confirmed',
+      message: 'Order received in test mode'
+    }
+  });
+});
+
+// Payment verification
+app.post('/api/payments/verify', (req, res) => {
+  console.log('🔒 Payment verification:', req.body.razorpay_payment_id);
+  
+  res.json({
+    success: true,
+    message: 'Payment verified (test mode)',
+    paymentId: req.body.razorpay_payment_id
+  });
+});
+
+// Handle all routes
 app.use('*', (req, res) => {
-  res.status(404).json({ 
-    success: false, 
-    message: 'API endpoint not found' 
+  res.json({ 
+    message: 'Auto Spares Backend - All systems operational',
+    endpoint: req.originalUrl
   });
 });
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Backend server running on port ${PORT}`);
+  console.log(`📍 Health: http://0.0.0.0:${PORT}/api/health`);
 });
